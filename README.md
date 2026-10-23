@@ -16,7 +16,7 @@ backend/    -> API FastAPI
 frontend/   -> SPA React
 ```
 
-## Como rodar
+## Executando o projeto
 
 ### Backend (Docker)
 
@@ -41,14 +41,14 @@ npm run dev
 
 SPA sobe em `http://localhost:5173`, consumindo a API em `http://localhost:8000` (configurável em `frontend/.env` via `VITE_API_URL`).
 
-## Modelo de domínio
+## Domínio
 
 - `User` (role: `client` | `owner`)
 - `Service` (nome, duração, preço) — pertence a um `owner`
 - `AvailabilitySlot` (horário disponível criado pelo `owner`)
 - `Appointment` (agendamento de um `client` em um `slot`, para um `service`)
 
-## Analytics / comportamento dos clientes
+## Analytics / simulação de análise comportamental
 
 Endpoints em `/analytics/*` (somente `owner`):
 - `summary`: totais gerais (agendamentos, clientes, taxa de cancelamento)
