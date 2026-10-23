@@ -16,7 +16,7 @@ backend/    -> API FastAPI
 frontend/   -> SPA React
 ```
 
-## Como executar
+## Executando o projeto
 
 ### Backend (Docker)
 
