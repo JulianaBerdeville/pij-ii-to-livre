@@ -3,12 +3,15 @@ import type { AvailabilitySlot } from "../types";
 
 export async function listAvailability(
   ownerId: number,
-  onlyAvailable = true
+  onlyAvailable = true,
+  serviceId?: number | null
 ): Promise<AvailabilitySlot[]> {
   const { data } = await api.get<AvailabilitySlot[]>("/availability", {
-    params: { owner_id: ownerId, only_available: onlyAvailable },
+    params: { owner_id: ownerId, only_available: onlyAvailable, service_id: serviceId ?? undefined },
   });
-  return data;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return data.filter((slot) => new Date(slot.start_time) >= startOfToday);
 }
 
 export async function createSlotsBulk(payload: {

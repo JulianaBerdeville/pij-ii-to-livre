@@ -16,6 +16,7 @@ class AppointmentRead(BaseModel):
     client_id: int
     service_id: int
     slot_id: int
+    start_time: datetime
     status: AppointmentStatus
     notes: str | None
     created_at: datetime

@@ -53,5 +53,9 @@ def delete_service(service_id: int, db: Session = Depends(get_db), owner: User =
     service = db.query(Service).filter(Service.id == service_id, Service.owner_id == owner.id).first()
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Serviço não encontrado")
-    db.delete(service)
+    if service.appointments:
+        # preserva o histórico de agendamentos e das análises
+        service.active = False
+    else:
+        db.delete(service)
     db.commit()

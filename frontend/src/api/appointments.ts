@@ -20,6 +20,11 @@ export async function ownerAppointments(): Promise<Appointment[]> {
   return data;
 }
 
+export async function completeAppointment(id: number): Promise<Appointment> {
+  const { data } = await api.patch<Appointment>(`/appointments/${id}/complete`);
+  return data;
+}
+
 export async function cancelAppointment(id: number): Promise<Appointment> {
   const { data } = await api.patch<Appointment>(`/appointments/${id}/cancel`);
   return data;

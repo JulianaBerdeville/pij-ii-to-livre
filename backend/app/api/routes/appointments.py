@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_client, get_current_owner, get_current_user
+from app.core.scheduling import release_slots, slots_to_book
 from app.db.session import get_db
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.availability import AvailabilitySlot, SlotStatus
@@ -26,10 +27,18 @@ def create_appointment(
     if not service:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Serviço inválido para este proprietário")
 
+    covered_slots = slots_to_book(db, slot, service.duration_minutes)
+    if covered_slots is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Não há tempo livre suficiente ({service.duration_minutes} min) a partir deste horário",
+        )
+
     appointment = Appointment(
         client_id=client.id, service_id=service.id, slot_id=slot.id, notes=payload.notes
     )
-    slot.status = SlotStatus.BOOKED
+    for covered in covered_slots:
+        covered.status = SlotStatus.BOOKED
     db.add(appointment)
     db.commit()
     db.refresh(appointment)
@@ -57,6 +66,29 @@ def owner_appointments(db: Session = Depends(get_db), owner: User = Depends(get_
     )
 
 
+@router.patch("/{appointment_id}/complete", response_model=AppointmentRead)
+def complete_appointment(
+    appointment_id: int, db: Session = Depends(get_db), owner: User = Depends(get_current_owner)
+):
+    appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agendamento não encontrado")
+
+    slot = db.query(AvailabilitySlot).filter(AvailabilitySlot.id == appointment.slot_id).first()
+    if slot is None or slot.owner_id != owner.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para concluir")
+
+    if appointment.status != AppointmentStatus.SCHEDULED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Apenas agendamentos agendados podem ser concluídos"
+        )
+
+    appointment.status = AppointmentStatus.COMPLETED
+    db.commit()
+    db.refresh(appointment)
+    return appointment
+
+
 @router.patch("/{appointment_id}/cancel", response_model=AppointmentRead)
 def cancel_appointment(
     appointment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
@@ -73,7 +105,7 @@ def cancel_appointment(
 
     appointment.status = AppointmentStatus.CANCELLED
     if slot:
-        slot.status = SlotStatus.AVAILABLE
+        release_slots(db, appointment, slot)
     db.commit()
     db.refresh(appointment)
     return appointment

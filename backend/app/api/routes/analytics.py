@@ -22,6 +22,7 @@ def _owner_appointments_df(db: Session, owner_id: int) -> pd.DataFrame:
             Appointment.status,
             Appointment.created_at,
             Service.name.label("service_name"),
+            Service.duration_minutes,
             AvailabilitySlot.start_time,
         )
         .join(AvailabilitySlot, Appointment.slot_id == AvailabilitySlot.id)
@@ -29,7 +30,10 @@ def _owner_appointments_df(db: Session, owner_id: int) -> pd.DataFrame:
         .filter(AvailabilitySlot.owner_id == owner_id)
         .all()
     )
-    return pd.DataFrame(rows, columns=["id", "client_id", "status", "created_at", "service_name", "start_time"])
+    return pd.DataFrame(
+        rows,
+        columns=["id", "client_id", "status", "created_at", "service_name", "duration_minutes", "start_time"],
+    )
 
 
 @router.get("/summary")
@@ -56,6 +60,26 @@ def by_service(db: Session = Depends(get_db), owner: User = Depends(get_current_
         return []
     counts = df.groupby("service_name").size().reset_index(name="count")
     return counts.to_dict(orient="records")
+
+
+@router.get("/time-by-service")
+def time_by_service(db: Session = Depends(get_db), owner: User = Depends(get_current_owner)):
+    """Tempo total (minutos) ocupado por cada serviço, sem contar agendamentos cancelados."""
+    df = _owner_appointments_df(db, owner.id)
+    if df.empty:
+        return []
+    df = df[df["status"] != AppointmentStatus.CANCELLED.value]
+    if df.empty:
+        return []
+    totals = (
+        df.groupby("service_name")
+        .agg(total_minutes=("duration_minutes", "sum"), appointments=("id", "count"))
+        .reset_index()
+        .sort_values("total_minutes", ascending=False)
+    )
+    totals["total_minutes"] = totals["total_minutes"].astype(int)
+    totals["appointments"] = totals["appointments"].astype(int)
+    return totals.to_dict(orient="records")
 
 
 @router.get("/by-weekday")
