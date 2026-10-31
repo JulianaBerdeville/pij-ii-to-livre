@@ -35,6 +35,7 @@ export interface Appointment {
   client_id: number;
   service_id: number;
   slot_id: number;
+  start_time: string;
   status: AppointmentStatus;
   notes: string | null;
   created_at: string;

@@ -22,6 +22,12 @@ export interface HourCount {
   count: number;
 }
 
+export interface ServiceTime {
+  service_name: string;
+  total_minutes: number;
+  appointments: number;
+}
+
 export interface TopClient {
   client_id: number;
   client_name: string;
@@ -42,6 +48,11 @@ export async function getSummary(): Promise<SummaryData> {
 
 export async function getByService(): Promise<ServiceCount[]> {
   const { data } = await api.get<ServiceCount[]>("/analytics/by-service");
+  return data;
+}
+
+export async function getTimeByService(): Promise<ServiceTime[]> {
+  const { data } = await api.get<ServiceTime[]>("/analytics/time-by-service");
   return data;
 }
 

@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_owner
+from app.core.scheduling import covering_run
 from app.db.session import get_db
 from app.models.availability import AvailabilitySlot, SlotStatus
+from app.models.service import Service
 from app.models.user import User
 from app.schemas.availability import AvailabilityBulkCreate, AvailabilitySlotCreate, AvailabilitySlotRead
 
@@ -18,16 +20,30 @@ def list_slots(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     only_available: bool = True,
+    service_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     query = db.query(AvailabilitySlot).filter(AvailabilitySlot.owner_id == owner_id)
     if date_from:
         query = query.filter(AvailabilitySlot.start_time >= date_from)
-    if date_to:
-        query = query.filter(AvailabilitySlot.start_time <= date_to)
     if only_available:
         query = query.filter(AvailabilitySlot.status == SlotStatus.AVAILABLE)
-    return query.order_by(AvailabilitySlot.start_time).all()
+    # date_to só é aplicado ao início do atendimento; a cobertura precisa dos horários seguintes
+    slots = query.order_by(AvailabilitySlot.start_time).all()
+
+    if service_id is not None:
+        service = db.query(Service).filter(Service.id == service_id, Service.owner_id == owner_id).first()
+        if not service:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Serviço não encontrado")
+        slots = [
+            slot
+            for i, slot in enumerate(slots)
+            if covering_run(slots, i, service.duration_minutes) is not None
+        ]
+
+    if date_to:
+        slots = [slot for slot in slots if slot.start_time <= date_to]
+    return slots
 
 
 @router.post("", response_model=AvailabilitySlotRead, status_code=status.HTTP_201_CREATED)

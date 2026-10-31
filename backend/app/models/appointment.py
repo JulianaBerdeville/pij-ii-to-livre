@@ -29,3 +29,7 @@ class Appointment(Base):
     client: Mapped["User"] = relationship(back_populates="appointments")
     service: Mapped["Service"] = relationship(back_populates="appointments")
     slot: Mapped["AvailabilitySlot"] = relationship(back_populates="appointment")
+
+    @property
+    def start_time(self) -> datetime:
+        return self.slot.start_time

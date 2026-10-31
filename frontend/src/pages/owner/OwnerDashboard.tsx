@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { createService, deleteService, listServices } from "../../api/services";
 import { createSlotsBulk, deleteSlot, listAvailability } from "../../api/availability";
-import { ownerAppointments, cancelAppointment } from "../../api/appointments";
+import { ownerAppointments, cancelAppointment, completeAppointment } from "../../api/appointments";
 import type { Appointment, AvailabilitySlot, Service } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { appointmentStatusLabels, slotStatusLabels } from "../../utils/labels";
@@ -30,7 +30,7 @@ export function OwnerDashboard() {
 
   function refreshAll() {
     if (!user) return;
-    listServices(user.id, false).then(setServices);
+    listServices(user.id, true).then(setServices);
     listAvailability(user.id, false).then(setSlots);
     ownerAppointments().then(setAppointments);
   }
@@ -43,7 +43,11 @@ export function OwnerDashboard() {
   }
 
   async function handleDeleteService(id: number) {
-    await deleteService(id);
+    try {
+      await deleteService(id);
+    } catch {
+      alert("Não foi possível remover o serviço.");
+    }
     refreshAll();
   }
 
@@ -64,10 +68,17 @@ export function OwnerDashboard() {
     refreshAll();
   }
 
+  async function handleCompleteAppointment(id: number) {
+    await completeAppointment(id);
+    refreshAll();
+  }
+
   async function handleCancelAppointment(id: number) {
     await cancelAppointment(id);
     refreshAll();
   }
+
+  const pendingAppointments = appointments.filter((a) => a.status === "scheduled");
 
   return (
     <div className="dashboard">
@@ -176,15 +187,18 @@ export function OwnerDashboard() {
 
       <section>
         <h2>Agendamentos recebidos</h2>
-        {appointments.length === 0 ? (
+        {pendingAppointments.length === 0 ? (
           <p>Você ainda não tem horários reservados</p>
         ) : (
           <ul className="slot-list">
-            {appointments.map((a) => (
+            {pendingAppointments.map((a) => (
               <li key={a.id}>
                 #{a.id} — status: {appointmentStatusLabels[a.status]}
                 {a.status === "scheduled" && (
-                  <button onClick={() => handleCancelAppointment(a.id)}>cancelar</button>
+                  <div className="slot-actions">
+                    <button onClick={() => handleCompleteAppointment(a.id)}>concluir</button>
+                    <button onClick={() => handleCancelAppointment(a.id)}>cancelar</button>
+                  </div>
                 )}
               </li>
             ))}
